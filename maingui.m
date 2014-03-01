@@ -61,6 +61,33 @@ guidata(hObject, handles);
 % UIWAIT makes maingui wait for user response (see UIRESUME)
 % uiwait(handles.figure1);
 
+%% Set up live update
+t = timer('ExecutionMode', 'fixedRate', 'Period', 2);
+t.TimerFcn = {@updatePosition, handles};
+start(t);
+
+% function for live udpating
+function updatePosition(~, ~, handles)
+%set global variables
+ISS_POSITION_JSON_URL = 'http://api.open-notify.org/iss-now.json';
+hObject = handles.liveposupdate;
+
+% check if button is on
+if (get(hObject, 'Value') == get(hObject, 'Max'))
+    iss_position_json = parse_json(urlread(ISS_POSITION_JSON_URL));
+    if (strcmp(iss_position_json{1}.message,'success'))
+        longitude = iss_position_json{1}.iss_position.longitude;
+        latitude = iss_position_json{1}.iss_position.latitude;
+        
+        %x = get(handles.posLat, 'String');
+        set(handles.posLat, 'String', strcat({'Latitude:    '}, num2str(latitude)));
+        
+        %x = get(handles.posLon, 'String');
+        set(handles.posLon, 'String', strcat({'Longitude:    '}, num2str(longitude)));
+    end
+end
+
+
 
 % --- Outputs from this function are returned to the command line.
 function varargout = maingui_OutputFcn(hObject, eventdata, handles) 
@@ -101,3 +128,4 @@ function liveposupdate_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of liveposupdate
+
