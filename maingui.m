@@ -22,7 +22,7 @@ function varargout = maingui(varargin)
 
 % Edit the above text to modify the response to help maingui
 
-% Last Modified by GUIDE v2.5 01-Mar-2014 15:41:24
+% Last Modified by GUIDE v2.5 04-Mar-2014 01:40:27
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -65,6 +65,7 @@ global targets_array;
 targets = repmat(struct( ...
     'identifier', '', ...
     'name', '', ...
+    'lense', '', ...
     'Notes', '', ...
     'Latitude', 0, ...
     'Longitude', 0, ...
@@ -100,15 +101,15 @@ end
 
 function addToTargets(incoming, handles)
 global targets_array;
-targets_array.target(...
-    targets_array.count + 1) ...
-    = ...
-    incoming;
+targets_array.target(targets_array.count + 1) = incoming;
 targets_array.count = targets_array.count + 1;
+targets_array.name{targets_array.count} = incoming.name;
 if (targets_array.current == 0)
     targets_array.current = 1;
     updateTarget(handles);
 end
+
+set(handles.targetslist,'String',targets_array.name, 'Value', targets_array.count);
 
 
 % --- Outputs from this function are returned to the command line.
@@ -122,25 +123,41 @@ function varargout = maingui_OutputFcn(hObject, eventdata, handles)
 varargout{1} = handles.output;
 
 
-% --- Executes on button press in nextTarget.
-function nextTarget_Callback(~, ~, handles)
-% hObject    handle to nextTarget (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-global targets_array;
-targets_array.current = targets_array.current + 1;
-if (targets_array.current > targets_array.count)
-    targets_array.current = 1;
-end
-
-updateTarget(handles);
-
-
 % --- Executes on button press in addtarget.
 function addtarget_Callback(hObject, eventdata, handles)
 % hObject    handle to addtarget (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+prompt = {'Enter Target Name:*','Target Latitude:*', 'Target Longitude:*', ...
+    'Lens(es)', 'Notes:'};
+dlg_title = 'Enter Custom Target!';
+num_lines = [1 35;1 10;1 10;1 20;5 50];
+defaultanswer = {'','','','',''};
+options.Resize='on';
+options.WindowStyle='modal';
+options.Interpreter='tex';
+retData = inputdlg(prompt, dlg_title, num_lines);
+
+disp(retData);
+
+name = retData{1};
+lat = retData{2};
+long = retData{3};
+lenses = retData{4};
+notes = retData{5};
+
+addToTargets(struct( ...
+    'identifier', num2str(clock), ...
+    'name', name, ...
+    'lense', lenses, ...
+    'Notes', notes, ...
+    'Latitude', lat, ...
+    'Longitude', long, ...
+    'Time', clock ...
+ ), handles);
+ %'Time', datenum(curDate(1), curDate(2), curDate(3), str2double(timetoken{1}(1)), ...
+    %   str2double(timetoken{1}(2)), str2double(timetoken{1}(3))) ...
+
 
 
 % --- Executes on button press in importtargets.
@@ -161,23 +178,48 @@ for i = 1:length(sites_root);
 end
 
 function handleXMLTarget(target, handles)
-positionPattern = 'Closest approach lat: (-?\d*.?\d*), lon: (-?\d*.?\d*) at (\d{2}):(\d{2}):(\d{2})';
-[match, token] = regexp(target.Attributes.Notes, positionPattern, 'match', 'tokens');
+positionPattern = 'Closest approach lat: (-?\d*.?\d*), lon: (-?\d*.?\d*)';
+[posmatch, postoken] = regexp(target.Attributes.Notes, positionPattern, 'match', 'tokens');
 
-if (isempty(match))
-    token = cell(1);
-    token{1}(1:5) = '0';
+if (isempty(posmatch))
+    postoken = cell(1);
+    postoken{1}(1:2) = '0';
+end
+
+timePattern = 'GMT: (\d{2}):(\d{2}):(\d{2})';
+[timematch, timetoken] = regexp(target.Attributes.Notes, timePattern, 'match', 'tokens');
+
+if (isempty(timematch))
+    timetoken = cell(1);
+    timetoken{1}(1:3) = '0';
+end
+
+lensePattern = 'Lens\(es\): (\d+.?.?)*';
+[lensematch, lensetoken] = regexp(target.Attributes.Notes, lensePattern, 'match', 'tokens');
+
+if (isempty(lensematch))
+    lensetoken = cell(1);
+    lensetoken{1}(1) = '0';
+end
+
+notesPattern = 'Lens([^;]*);\s*([^;]*)';
+[notesmatch, notestoken] = regexp(target.Attributes.Notes, notesPattern, 'match', 'tokens');
+
+if (isempty(notesmatch))
+    notestoken = cell(1);
+    notestoken{1}(1:2) = '-';
 end
 
 curDate = clock;
 addToTargets(struct( ...
     'identifier', target.Attributes.Ident, ...
     'name', target.Attributes.Nomenclature, ...
-    'Notes', target.Attributes.Notes, ...
-    'Latitude', token{1}(1), ...
-    'Longitude', token{1}(2), ...
-    'Time', datenum(curDate(1), curDate(2), curDate(3), str2double(token{1}(3)), ...
-        str2double(token{1}(4)), str2double(token{1}(5))) ...
+    'lense', lensetoken{1}(1), ...
+    'Notes', notestoken{1}(2), ...
+    'Latitude', postoken{1}(1), ...
+    'Longitude', postoken{1}(2), ...
+    'Time', datenum(curDate(1), curDate(2), curDate(3), str2double(timetoken{1}(1)), ...
+        str2double(timetoken{1}(2)), str2double(timetoken{1}(3))) ...
  ), handles);
 
 function updateTarget(handles)
@@ -188,6 +230,7 @@ set(handles.targetcoord, 'String', strcat({'Lat: '}, newTarget.Latitude, ...
     {'; Lon: '}, newTarget.Longitude));
 set(handles.targetCountdown, 'String', datestr(newTarget.Time, 'HH:MM:SS'));
 set(handles.targetNotes, 'String', newTarget.Notes);
+set(handles.targetlenses, 'String', newTarget.lense);
 
 
 % --- Executes on button press in liveposupdate.
@@ -198,3 +241,29 @@ function liveposupdate_Callback(~, ~, handles)
 
 % Hint: get(hObject,'Value') returns toggle state of liveposupdate
 updatePosition(0,0,handles);
+
+
+% --- Executes on selection change in targetslist.
+function targetslist_Callback(hObject, eventdata, handles)
+% hObject    handle to targetslist (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: contents = cellstr(get(hObject,'String')) returns targetslist contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from targetslist
+global targets_array;
+targets_array.current = get(hObject,'Value');
+updateTarget(handles);
+
+
+% --- Executes during object creation, after setting all properties.
+function targetslist_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to targetslist (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: listbox controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
