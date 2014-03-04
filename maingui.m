@@ -1,26 +1,9 @@
 function varargout = maingui(varargin)
-% MAINGUI MATLAB code for maingui.fig
-%      MAINGUI, by itself, creates a new MAINGUI or raises the existing
-%      singleton*.
+% Main GUI for launching a tool to assist Internation Space Station
+% Astronauts in finding targets and taking pictures from space.
 %
-%      H = MAINGUI returns the handle to a new MAINGUI or the handle to
-%      the existing singleton*.
-%
-%      MAINGUI('CALLBACK',hObject,eventData,handles,...) calls the local
-%      function named CALLBACK in MAINGUI.M with the given input arguments.
-%
-%      MAINGUI('Property','Value',...) creates a new MAINGUI or raises the
-%      existing singleton*.  Starting from the left, property value pairs are
-%      applied to the GUI before maingui_OpeningFcn gets called.  An
-%      unrecognized property name or invalid value makes property application
-%      stop.  All inputs are passed to maingui_OpeningFcn via varargin.
-%
-%      *See GUI Options on GUIDE's Tools menu.  Choose "GUI allows only one
-%      instance to run (singleton)".
-%
-% See also: GUIDE, GUIDATA, GUIHANDLES
-
-% Edit the above text to modify the response to help maingui
+% For Columbia IEME 4810: Intro to Human Spaceflight, Professor Massimino
+% CJ
 
 % Last Modified by GUIDE v2.5 04-Mar-2014 01:40:27
 
