@@ -26,7 +26,6 @@ else
 end
 % End initialization code - DO NOT EDIT
 
-
 % --- Executes just before maingui is made visible.
 function maingui_OpeningFcn(hObject, eventdata, handles, varargin)
 % This function has no output args, see OutputFcn.
@@ -37,6 +36,37 @@ function maingui_OpeningFcn(hObject, eventdata, handles, varargin)
 
 % Choose default command line output for maingui
 handles.output = hObject;
+
+% set up map
+axes(handles.axes2);
+ax = worldmap('World');
+land = shaperead('landareas', 'UseGeoCoords', true);
+geoshow(ax, land, 'FaceColor', [0.5 0.7 0.5])
+lakes = shaperead('worldlakes', 'UseGeoCoords', true);
+geoshow(lakes, 'FaceColor', 'blue')
+rivers = shaperead('worldrivers', 'UseGeoCoords', true);
+geoshow(rivers, 'Color', 'blue')
+handles.worldmap = ax;
+
+global ISS_POSITION_DOT;
+ISS_POSITION_DOT = geoshow(handles.axes2, 0, 0);
+
+global TARGET_MARKER_WORLD;
+TARGET_MARKER_WORLD = geoshow(handles.axes2, 10, 10);
+
+% set up target terrian map
+axes(handles.axes3);
+% ax2 = worldmap('World');
+ax2 = worldmap([-1,1],[-1,1]);
+land = shaperead('landareas', 'UseGeoCoords', true);
+geoshow(ax2, land, 'FaceColor', [0.5 0.7 0.5])
+lakes = shaperead('worldlakes', 'UseGeoCoords', true);
+geoshow(lakes, 'FaceColor', 'blue')
+rivers = shaperead('worldrivers', 'UseGeoCoords', true);
+geoshow(rivers, 'Color', 'blue')
+
+global TARGET_MARKER_TER;
+TARGET_MARKER_TER = geoshow(handles.axes3, 20, 20);
 
 % Update handles structure
 guidata(hObject, handles);
@@ -57,12 +87,13 @@ targets = repmat(struct( ...
 targets_array = struct('targets', targets, 'current', 0, 'count', 0);
 
 %% Set up live update
-t = timer('ExecutionMode', 'fixedRate', 'Period', 2);
+t = timer('ExecutionMode', 'fixedRate', 'Period', 5);
 t.TimerFcn = {@updatePosition, handles};
 start(t);
 
 % function for live udpating
 function updatePosition(~, ~, handles)
+global ISS_POSITION_DOT;
 %set global variables
 ISS_POSITION_JSON_URL = 'http://api.open-notify.org/iss-now.json';
 hObject = handles.liveposupdate;
@@ -79,10 +110,20 @@ if (get(hObject, 'Value') == get(hObject, 'Max'))
         
         %x = get(handles.posLon, 'String');
         set(handles.posLon, 'String', strcat({'Longitude:    '}, num2str(longitude)));
+        
+        %update map
+        delete(ISS_POSITION_DOT);
+        %ISS_POSITION_DOT = 
+        %set(gcf,'CurrentMapAxes',handles.axes2);
+        %scatterm(latitude, longitude, 25, 'red', 'filled');
+        ISS_POSITION_DOT = geoshow(handles.axes2, latitude, longitude, ...
+            'DisplayType', 'point', 'Marker', 'diamond', ...
+            'MarkerFaceColor', 'red', 'MarkerSize', 10);
     end
 end
 
 function addToTargets(incoming, handles)
+% add to array
 global targets_array;
 targets_array.target(targets_array.count + 1) = incoming;
 targets_array.count = targets_array.count + 1;
@@ -207,6 +248,8 @@ addToTargets(struct( ...
 
 function updateTarget(handles)
 global targets_array;
+global TARGET_MARKER_WORLD;
+global TARGET_MARKER_TER;
 newTarget = targets_array.target(targets_array.current);
 set(handles.targetname, 'String', newTarget.name);
 set(handles.targetcoord, 'String', strcat({'Lat: '}, newTarget.Latitude, ...
@@ -214,6 +257,52 @@ set(handles.targetcoord, 'String', strcat({'Lat: '}, newTarget.Latitude, ...
 set(handles.targetCountdown, 'String', datestr(newTarget.Time, 'HH:MM:SS'));
 set(handles.targetNotes, 'String', newTarget.Notes);
 set(handles.targetlenses, 'String', newTarget.lense);
+
+delete(TARGET_MARKER_WORLD);
+TARGET_MARKER_WORLD = geoshow(handles.axes2, str2double(newTarget.Latitude), ...
+    str2double(newTarget.Longitude), ...
+    'DisplayType', 'point', 'Marker', '+', ...
+    'MarkerFaceColor', 'red', 'MarkerSize', 10);
+
+% set up map
+axes(handles.axes3);
+incLat = str2double(newTarget.Latitude);
+incLon = str2double(newTarget.Longitude);
+latLim = [incLat - 5, incLat + 5];
+lonLim = [incLon - 5, incLon + 5];
+
+ax = worldmap(latLim, lonLim);
+land = shaperead('landareas', 'UseGeoCoords', true);
+geoshow(ax, land, 'FaceColor', 'none')%[0.5 0.7 0.5])
+% 
+% lakes = shaperead('worldlakes', 'UseGeoCoords', true);
+% geoshow(lakes, 'FaceColor', 'blue')
+% 
+% rivers = shaperead('worldrivers', 'UseGeoCoords', true);
+% geoshow(rivers, 'Color', 'blue')
+% cities = shaperead('worldcities', 'UseGeoCoords', true);
+% geoshow(ax, cities, 'Marker', '.', 'Color', 'orange')
+
+layers = wmsfind('nasa.network*elev', 'SearchField', 'serverurl');
+layers = wmsupdate(layers);
+aster = layers(1);
+
+cellSize = dms2degrees([0,1,0]);
+[ZA, RA] = wmsread(aster, 'Latlim', latLim, 'Lonlim', lonLim, ...
+   'CellSize', cellSize, 'ImageFormat', 'image/bil');
+geoshow(ax, ZA, RA, 'DisplayType', 'texturemap')
+demcmap(double(ZA))
+%contourm(double(ZA), RA, [0 0], 'Color', 'black')
+colorbar
+
+cities = shaperead('worldcities', 'UseGeoCoords', true);
+geoshow(ax, cities, 'Marker', '.', 'Color', 'white')
+
+TARGET_MARKER_TER = geoshow(handles.axes3, str2double(newTarget.Latitude), ...
+    str2double(newTarget.Longitude), ...
+    'DisplayType', 'point', 'Marker', 'o', ...
+    'MarkerFaceColor', 'red', 'MarkerSize', 10);
+
 
 
 % --- Executes on button press in liveposupdate.
