@@ -5,7 +5,7 @@ function varargout = maingui(varargin)
 % For Columbia IEME 4810: Intro to Human Spaceflight, Professor Massimino
 % CJ
 
-% Last Modified by GUIDE v2.5 04-Mar-2014 01:40:27
+% Last Modified by GUIDE v2.5 14-Apr-2014 20:57:05
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -82,7 +82,8 @@ targets = repmat(struct( ...
     'Notes', '', ...
     'Latitude', 0, ...
     'Longitude', 0, ...
-    'Time', clock ...
+    'Time', clock, ...
+    'CloudCover', '-1' ...
  ), 1024, 1);
 targets_array = struct('targets', targets, 'current', 0, 'count', 0);
 
@@ -90,6 +91,18 @@ targets_array = struct('targets', targets, 'current', 0, 'count', 0);
 t = timer('ExecutionMode', 'fixedRate', 'Period', 5);
 t.TimerFcn = {@updatePosition, handles};
 start(t);
+
+t2 = timer('ExecutionMode', 'fixedRate', 'Period', 2*60);
+t2.TimerFcn = @updateCC;
+start(t2);
+
+function updateCC(~, ~)
+global targets_array;
+
+for i=1:targets_array.count
+    tmp = targets_array.target(i);
+    tmp.CloudCover = getCurCC(tmp.Latitude, tmp.Longitude);
+end
 
 % function for live udpating
 function updatePosition(~, ~, handles)
@@ -133,7 +146,7 @@ if (targets_array.current == 0)
     updateTarget(handles);
 end
 
-set(handles.targetslist,'String',targets_array.name, 'Value', targets_array.count);
+set(handles.targetslist,'String',targets_array.name, 'Value', targets_array.current);
 
 
 % --- Outputs from this function are returned to the command line.
@@ -146,16 +159,33 @@ function varargout = maingui_OutputFcn(hObject, eventdata, handles)
 % Get default command line output from handles structure
 varargout{1} = handles.output;
 
+function time = getNextISSPass(lat, lon)
+iss_pass_json_url = strcat('http://api.open-notify.org/iss-pass.json?lat=', lat, '&lon=', lon, '&n=1');
+
+% check if button is on
+iss_pass_json = parse_json(urlread(iss_pass_json_url));
+if (strcmp(iss_pass_json{1}.message,'success'))
+    time_unixTS = iss_pass_json{1}.response{1}.risetime;
+    time = datestr(time_unixTS/86400 + datenum(1970,1,1), 'mmm dd HH:MM:SS');
+end
+
+function cc = getCurCC(lat, lon)
+cc_json_url = strcat('http://api.openweathermap.org/data/2.5/forecast/daily?mode=json&cnt=1&rain=f&lat=', lat, '&lon=', lon)
+
+% check if button is on
+weather_json = parse_json(urlread(cc_json_url));
+cc = weather_json{1}.list{1}.clouds
 
 % --- Executes on button press in addtarget.
 function addtarget_Callback(hObject, eventdata, handles)
 % hObject    handle to addtarget (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+set(handles.loadingmarker, 'String', 'LOADING...');
 prompt = {'Enter Target Name:*','Target Latitude:*', 'Target Longitude:*', ...
     'Lens(es)', 'Notes:'};
 dlg_title = 'Enter Custom Target!';
-num_lines = [1 35;1 10;1 10;1 20;5 50];
+num_lines = [1 35;1 13;1 13;1 20;5 50];
 defaultanswer = {'','','','',''};
 options.Resize='on';
 options.WindowStyle='modal';
@@ -177,19 +207,20 @@ addToTargets(struct( ...
     'Notes', notes, ...
     'Latitude', lat, ...
     'Longitude', long, ...
-    'Time', clock ...
+    'Time', getNextISSPass(lat, long), ...
+    'CloudCover', getCurCC(char(lat), char(long)) ...
  ), handles);
  %'Time', datenum(curDate(1), curDate(2), curDate(3), str2double(timetoken{1}(1)), ...
     %   str2double(timetoken{1}(2)), str2double(timetoken{1}(3))) ...
-
-
+set(handles.loadingmarker, 'String', '');
+    
 
 % --- Executes on button press in importtargets.
 function importtargets_Callback(~, ~, handles)
 % hObject    handle to importtargets (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-
+set(handles.loadingmarker, 'String', 'LOADING...');
 [FileName,PathName] = uigetfile('*.xml', 'Select XML of Targets', 'targets.xml');
 fullXMLpath = strcat(PathName, FileName);
 
@@ -200,6 +231,7 @@ sites_root = targets_struct.wmc__TEOSiteMgr.EOSites.wmc__TEOSite;
 for i = 1:length(sites_root);
     handleXMLTarget(sites_root{i}, handles);
 end
+set(handles.loadingmarker, 'String', ' ');
 
 function handleXMLTarget(target, handles)
 positionPattern = 'Closest approach lat: (-?\d*.?\d*), lon: (-?\d*.?\d*)';
@@ -243,7 +275,8 @@ addToTargets(struct( ...
     'Latitude', postoken{1}(1), ...
     'Longitude', postoken{1}(2), ...
     'Time', datenum(curDate(1), curDate(2), curDate(3), str2double(timetoken{1}(1)), ...
-        str2double(timetoken{1}(2)), str2double(timetoken{1}(3))) ...
+        str2double(timetoken{1}(2)), str2double(timetoken{1}(3))), ...
+    'CloudCover', getCurCC(char(postoken{1}(1)), char(postoken{1}(2))) ...
  ), handles);
 
 function updateTarget(handles)
@@ -257,6 +290,7 @@ set(handles.targetcoord, 'String', strcat({'Lat: '}, newTarget.Latitude, ...
 set(handles.targetCountdown, 'String', datestr(newTarget.Time, 'HH:MM:SS'));
 set(handles.targetNotes, 'String', newTarget.Notes);
 set(handles.targetlenses, 'String', newTarget.lense);
+set(handles.targetCC, 'String', strcat(num2str(newTarget.CloudCover), ' percent cloud cover'));
 
 delete(TARGET_MARKER_WORLD);
 TARGET_MARKER_WORLD = geoshow(handles.axes2, str2double(newTarget.Latitude), ...
@@ -305,6 +339,7 @@ TARGET_MARKER_TER = geoshow(handles.axes3, str2double(newTarget.Latitude), ...
 
 
 
+
 % --- Executes on button press in liveposupdate.
 function liveposupdate_Callback(~, ~, handles)
 % hObject    handle to liveposupdate (see GCBO)
@@ -323,9 +358,11 @@ function targetslist_Callback(hObject, eventdata, handles)
 
 % Hints: contents = cellstr(get(hObject,'String')) returns targetslist contents as cell array
 %        contents{get(hObject,'Value')} returns selected item from targetslist
+set(handles.loadingmarker, 'String', 'LOADING...');
 global targets_array;
 targets_array.current = get(hObject,'Value');
 updateTarget(handles);
+set(handles.loadingmarker, 'String', ' ');
 
 
 % --- Executes during object creation, after setting all properties.
@@ -339,3 +376,36 @@ function targetslist_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
+
+
+% --- Executes on button press in removeCurEntry.
+function removeCurEntry_Callback(hObject, eventdata, handles)
+% hObject    handle to removeCurEntry (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+set(handles.loadingmarker, 'String', 'LOADING...');
+global targets_array;
+tar_list = handles.targetslist;
+cur_val = get(tar_list, 'Value');
+curTarget = targets_array.target(cur_val);
+cur_num_tar = targets_array.count;
+
+% replace old junk
+if (targets_array.current == targets_array.count)
+    targets_array.current = targets_array.current - 1;
+end
+for i=cur_val:cur_num_tar - 1
+    targets_array.target(i) = targets_array.target(i + 1);
+end
+targets_array.count = targets_array.count - 1;
+
+% set up new name name variable for list
+targets_array.name = cell(1,targets_array.count);
+for i=1:targets_array.count;
+   targets_array.name{i} = targets_array.target(i).name; 
+end
+
+set(handles.targetslist,'String',targets_array.name, 'Value', targets_array.current);
+
+updateTarget(handles);
+set(handles.loadingmarker, 'String', ' ');
