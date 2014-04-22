@@ -56,7 +56,6 @@ TARGET_MARKER_WORLD = geoshow(handles.axes2, 10, 10);
 
 % set up target terrian map
 axes(handles.axes3);
-% ax2 = worldmap('World');
 ax2 = worldmap([-1,1],[-1,1]);
 land = shaperead('landareas', 'UseGeoCoords', true);
 geoshow(ax2, land, 'FaceColor', [0.5 0.7 0.5])
@@ -70,9 +69,6 @@ TARGET_MARKER_TER = geoshow(handles.axes3, 20, 20);
 
 % Update handles structure
 guidata(hObject, handles);
-
-% UIWAIT makes maingui wait for user response (see UIRESUME)
-% uiwait(handles.figure1);
 
 global targets_array;
 targets = repmat(struct( ...
@@ -118,17 +114,12 @@ if (get(hObject, 'Value') == get(hObject, 'Max'))
         longitude = iss_position_json{1}.iss_position.longitude;
         latitude = iss_position_json{1}.iss_position.latitude;
         
-        %x = get(handles.posLat, 'String');
         set(handles.posLat, 'String', strcat({'Latitude:    '}, num2str(latitude)));
         
-        %x = get(handles.posLon, 'String');
         set(handles.posLon, 'String', strcat({'Longitude:    '}, num2str(longitude)));
         
         %update map
         delete(ISS_POSITION_DOT);
-        %ISS_POSITION_DOT = 
-        %set(gcf,'CurrentMapAxes',handles.axes2);
-        %scatterm(latitude, longitude, 25, 'red', 'filled');
         ISS_POSITION_DOT = geoshow(handles.axes2, latitude, longitude, ...
             'DisplayType', 'point', 'Marker', 'diamond', ...
             'MarkerFaceColor', 'red', 'MarkerSize', 10);
@@ -170,11 +161,11 @@ if (strcmp(iss_pass_json{1}.message,'success'))
 end
 
 function cc = getCurCC(lat, lon)
-cc_json_url = strcat('http://api.openweathermap.org/data/2.5/forecast/daily?mode=json&cnt=1&rain=f&lat=', lat, '&lon=', lon)
+cc_json_url = strcat('http://api.openweathermap.org/data/2.5/forecast/daily?mode=json&cnt=1&rain=f&lat=', lat, '&lon=', lon);
 
 % check if button is on
 weather_json = parse_json(urlread(cc_json_url));
-cc = weather_json{1}.list{1}.clouds
+cc = weather_json{1}.list{1}.clouds;
 
 % --- Executes on button press in addtarget.
 function addtarget_Callback(hObject, eventdata, handles)
@@ -210,8 +201,7 @@ addToTargets(struct( ...
     'Time', getNextISSPass(lat, long), ...
     'CloudCover', getCurCC(char(lat), char(long)) ...
  ), handles);
- %'Time', datenum(curDate(1), curDate(2), curDate(3), str2double(timetoken{1}(1)), ...
-    %   str2double(timetoken{1}(2)), str2double(timetoken{1}(3))) ...
+
 set(handles.loadingmarker, 'String', '');
     
 
@@ -308,14 +298,6 @@ lonLim = [incLon - 5, incLon + 5];
 ax = worldmap(latLim, lonLim);
 land = shaperead('landareas', 'UseGeoCoords', true);
 geoshow(ax, land, 'FaceColor', 'none')%[0.5 0.7 0.5])
-% 
-% lakes = shaperead('worldlakes', 'UseGeoCoords', true);
-% geoshow(lakes, 'FaceColor', 'blue')
-% 
-% rivers = shaperead('worldrivers', 'UseGeoCoords', true);
-% geoshow(rivers, 'Color', 'blue')
-% cities = shaperead('worldcities', 'UseGeoCoords', true);
-% geoshow(ax, cities, 'Marker', '.', 'Color', 'orange')
 
 layers = wmsfind('nasa.network*elev', 'SearchField', 'serverurl');
 layers = wmsupdate(layers);
@@ -326,7 +308,6 @@ cellSize = dms2degrees([0,1,0]);
    'CellSize', cellSize, 'ImageFormat', 'image/bil');
 geoshow(ax, ZA, RA, 'DisplayType', 'texturemap')
 demcmap(double(ZA))
-%contourm(double(ZA), RA, [0 0], 'Color', 'black')
 colorbar
 
 cities = shaperead('worldcities', 'UseGeoCoords', true);
